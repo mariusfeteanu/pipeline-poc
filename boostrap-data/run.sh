@@ -32,10 +32,6 @@ while read -r dataset; do
         mkdir -p "$target_dir"
         unzip -q "$zipfile" -d "$target_dir"
     fi
-    
-    if [ -f "$zipfile" ]; then
-        rm "$zipfile"
-    fi
 
 done < "$DATASETS_FILE"
 
