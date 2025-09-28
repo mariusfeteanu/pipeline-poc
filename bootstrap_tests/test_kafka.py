@@ -22,6 +22,9 @@ consumer = KafkaConsumer(
     group_id="test-group",
 )
 
+max_message = 10
 for msg in consumer:
     print(f"Received: {msg.value.decode()}")
-    break
+    max_message -= 1
+    if not max_message:
+        break

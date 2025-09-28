@@ -56,6 +56,7 @@ services:
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       ALLOW_PLAINTEXT_LISTENER: "yes"
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_LOG_DIRS: /bitnami/kafka/data
     volumes:
       - kafka_data:/bitnami/kafka
     profiles: ["all", "event", "kafka"]
