@@ -1,9 +1,11 @@
+import random
 import pdfplumber
 
-# Path to your PDF file
-pdf_path = "../.data/papers/physics.pop-ph/pdf/1705.01467v1.pdf"
 
-# Open the PDF
+PDF_DIR = "../.data/papers/physics.pop-ph/pdf/"
+files = [f for f in os.listdir(PDF_DIR) if f.endswith(".pdf")]
+pdf_path = os.path.join(PDF_DIR, random.choice(files))
+
 with pdfplumber.open(pdf_path) as pdf:
     text = ""
     for page in pdf.pages:
