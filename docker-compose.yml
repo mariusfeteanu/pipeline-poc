@@ -16,8 +16,8 @@ services:
   weaviate:
     image: semitechnologies/weaviate:stable-v1.31-28ff7a3
     ports:
-      - "8080:8080"  # rest
-      # - "50051:50051"  # grpc
+      - "8081:8080"  # rest
+      - "50051:50051"  # grpc
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
