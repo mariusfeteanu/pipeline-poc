@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api_document"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+]
+
+[tool.setuptools]
+packages = ["api_document"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "build"
+]
