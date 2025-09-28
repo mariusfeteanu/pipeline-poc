@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "api_document"
 version = "0.1.0"
 dependencies = [
-    "fastapi",
+    "fastapi==0.117.1",
 ]
 
 [tool.setuptools]
@@ -14,7 +14,7 @@ packages = ["api_document"]
 
 [project.optional-dependencies]
 dev = [
-    "black",
-    "isort",
-    "build"
+    "black==25.9.0",
+    "isort==6.0.1",
+    "build==1.3.0"
 ]

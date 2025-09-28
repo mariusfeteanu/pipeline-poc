@@ -61,6 +61,18 @@ services:
       - kafka_data:/bitnami/kafka
     profiles: ["all", "event", "kafka"]
 
+  api_document:
+    build: ./api_document
+    container_name: api_document
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - weaviate
+      - minio
+      - kafka
+    profiles: ["all", "api"]
+
 volumes:
   postgres_data:
   weaviate_data:
