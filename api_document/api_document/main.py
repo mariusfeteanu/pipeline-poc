@@ -12,11 +12,20 @@ producer = None
 @app.on_event("startup")
 def startup_event():
     global producer
-    time.sleep(5)
-    producer = KafkaProducer(
-        bootstrap_servers="kafka:9092",
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
+    for i in range(5):
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers="kafka:9092",
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            )
+            # Test the connection
+            producer.bootstrap_connected()
+            logging.info("Connected to Kafka")
+            break
+        except Exception as e:
+            logging.warning(f"Kafka not available yet, retrying... ({i+1}/5)")
+            time.sleep(5)
+    logging.error("Failed to connect to Kafka after several attempts")
 
 @app.on_event("shutdown")
 def shutdown_event():
@@ -31,5 +40,5 @@ class DocumentLandedEvent(BaseModel):
 @app.post("/document/v1")
 def create_item_event(doc: DocumentLandedEvent):
     event = doc.model_dump(mode="json")
-    logging.debug(f"Sending event to Kafka: {event}")
+    logging.info(f"Sending event to Kafka: {event}")
     producer.send("document-landed", event)

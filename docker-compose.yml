@@ -51,11 +51,18 @@ services:
       KAFKA_CFG_PROCESS_ROLES: broker,controller
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       ALLOW_PLAINTEXT_LISTENER: "yes"
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CFG_LOG_DIRS: /bitnami/kafka/data
+      KAFKA_CREATE_TOPICS: >
+        document-landed:3:1,
+        document-landed-dlq:3:1,
+        document-stored:3:1,
+        document-stored-dlq:3:1,
+        document-embedded:3:1,
+        document-embedded-dlq:3:1
     volumes:
       - kafka_data:/bitnami/kafka
     profiles: ["all", "event", "kafka"]
