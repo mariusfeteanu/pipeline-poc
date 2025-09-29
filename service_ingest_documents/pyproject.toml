@@ -1,18 +1,14 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "api_document"
+name = "ingest_documents"
 version = "0.1.0"
 dependencies = [
-    "fastapi==0.117.1",
-    "kafka-python==2.2.15",
-    "uvicorn[standard]==0.37.0",
+    # intentionally different lib from the API endpoint
+    "confluent-kafka==2.11.1",
 ]
-
-[tool.setuptools]
-packages = ["api_document"]
 
 [project.optional-dependencies]
 dev = [

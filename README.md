@@ -6,6 +6,7 @@ To start all services defined in this project:
 
 ```bash
 docker compose build api_document
+docker compose build service_ingest_documents
 docker compose --profile all up -d
 ```
 

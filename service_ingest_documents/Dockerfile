@@ -4,8 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY dist/api_document-0.1.0-py3-none-any.whl  .
-RUN pip install --no-cache-dir api_document-0.1.0-py3-none-any.whl
+COPY dist/ingest_documents-0.1.0-py3-none-any.whl  .
+RUN pip install --no-cache-dir ingest_documents-0.1.0-py3-none-any.whl
 
 EXPOSE 8000
-CMD ["uvicorn", "api_document.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "ingest_documents.main"]

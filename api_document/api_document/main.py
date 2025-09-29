@@ -42,7 +42,7 @@ class DocumentLandedEvent(BaseModel):
 
 
 @app.post("/document/v1")
-def create_item_event(doc: DocumentLandedEvent):
+def document(doc: DocumentLandedEvent):
     producer: KafkaProducer | None = app.state.producer
     if producer is None:
         raise HTTPException(status_code=503, detail="Kafka not ready")

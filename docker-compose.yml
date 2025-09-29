@@ -76,6 +76,19 @@ services:
       - kafka
     profiles: ["all", "api"]
 
+  service_ingest_documents:
+    build: ./service_ingest_documents
+    container_name: service_ingest_documents
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: "document-landed"
+      KAFKA_OUTPUT_TOPIC: "document-stored"
+      KAFKA_GROUP_ID: "ingest-documents-group"
+      OBJECT_STORAGE_BUCKET: "documents"
+    depends_on:
+      - kafka
+    profiles: ["all", "service", "service_ingest_documents"]
+
 volumes:
   postgres_data:
   weaviate_data:
