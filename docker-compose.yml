@@ -32,9 +32,10 @@ services:
     container_name: minio
     ports:
       - "9000:9000"  # S3 API
+      - "9090:9090"  # Console
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9090"
     volumes:
       - minio_data:/data
@@ -84,9 +85,14 @@ services:
       KAFKA_INPUT_TOPIC: "document-landed"
       KAFKA_OUTPUT_TOPIC: "document-stored"
       KAFKA_GROUP_ID: "ingest-documents-group"
+      OBJECT_STORAGE_URL: "http://minio:9000"
       OBJECT_STORAGE_BUCKET: "documents"
+      OBJECT_STORAGE_USER: ${MINIO_ROOT_USER}
+      OBJECT_STORAGE_PASSWORD: ${MINIO_ROOT_PASSWORD}
     depends_on:
       - kafka
+    volumes:
+      - .data:/app/.data
     profiles: ["all", "service", "service_ingest_documents"]
 
 volumes:

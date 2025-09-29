@@ -2,6 +2,7 @@
 python3 -m venv .venv
 . .venv/bin/activate
 
+pip-compile pyproject.toml --output-file=requirements.txt  # to speed up dcker build
 pip install .[dev]
 
 mypy ingest_documents
@@ -15,7 +16,7 @@ python -m build --wheel
 ```bash
 curl -X POST "http://localhost:8000/document/v1" \
   -H "Content-Type: application/json" \
-  -d '{"path": ".data/papers/cs.CL/pdf/2509.20490v1.pdf", "file_type": "pdf", "file_source": "arxiv"}'
+  -d '{"path": ".data/papers/cs.CL/xml/2509.20321v1.xml", "file_type": "xml", "file_source": "arxiv"}'
 ```
 
 ```bash
