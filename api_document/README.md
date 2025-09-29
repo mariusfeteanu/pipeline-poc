@@ -1,8 +1,15 @@
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+
 pip-compile pyproject.toml --output-file=requirements.txt  # to speed up dcker build
 pip install .[dev]
+
+mypy api_document
+black api_document
+isort --profile=black api_document
+
+python -m build --wheel
 ```
 
 
