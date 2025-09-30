@@ -58,12 +58,12 @@ services:
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CFG_LOG_DIRS: /bitnami/kafka/data
       KAFKA_CREATE_TOPICS: >
-        document-landed:3:1,
-        document-landed-dlq:3:1,
-        document-stored:3:1,
-        document-stored-dlq:3:1,
-        document-embedded:3:1,
-        document-embedded-dlq:3:1
+        document-landed:33:1,
+        document-landed-dlq:33:1,
+        document-stored:33:1,
+        document-stored-dlq:33:1,
+        document-embedded:33:1,
+        document-embedded-dlq:33:1
     volumes:
       - kafka_data:/bitnami/kafka
     profiles: ["all", "event", "kafka"]
