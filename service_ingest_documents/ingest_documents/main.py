@@ -5,6 +5,19 @@ import os
 import boto3
 from confluent_kafka import Consumer, Producer  # type: ignore
 from mypy_boto3_s3.client import S3Client
+from opentelemetry import propagate, trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+provider = TracerProvider(
+    resource=Resource.create({"service.name": "service_ingest_documents"})
+)
+trace.set_tracer_provider(provider)
+otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4318/v1/traces")
+provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+tracer = trace.get_tracer(__name__)
 
 BOOTSTRAP_SERVERS = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
 INPUT_TOPIC = os.environ["KAFKA_INPUT_TOPIC"]
@@ -52,6 +65,10 @@ def process_message(object_storage_client: S3Client, msg_value: dict[str, str]) 
                 "original_path": path,
             },
         )
+    current_span = trace.get_current_span()
+    current_span.set_attribute("object_storage.bucket", OBJECT_STORAGE_BUCKET)
+    current_span.set_attribute("object_storage.key", key)
+    current_span.set_attribute("file.type", file_type)
     logging.info(f"Uploaded {path} to bucket {OBJECT_STORAGE_BUCKET} with key {key}")
     return json.dumps(
         {
@@ -101,9 +118,19 @@ def main() -> None:
                     logging.error(f"Consumer error: {msg.error()}")
                 continue
             value: dict[str, str] = json.loads(msg.value().decode("utf-8"))
-            result = process_message(object_storage_client, value)
-            producer.produce(OUTPUT_TOPIC, result.encode("utf-8"))
-            producer.flush()
+            raw_headers = msg.headers() or []
+            headers = {k: v.decode("utf-8") for k, v in raw_headers if v is not None}
+            ctx = propagate.extract(headers)
+
+            with tracer.start_as_current_span("process_message", context=ctx) as span:
+                result = process_message(object_storage_client, value)
+                carrier: dict[str, str] = {}
+                propagate.inject(carrier)
+                out_headers = [(k, v.encode("utf-8")) for k, v in carrier.items()]
+                producer.produce(
+                    OUTPUT_TOPIC, result.encode("utf-8"), headers=out_headers
+                )
+                producer.flush()
     except KeyboardInterrupt:
         pass
     finally:

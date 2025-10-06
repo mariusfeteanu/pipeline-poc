@@ -95,8 +95,21 @@ services:
       - .data:/app/.data
     profiles: ["all", "service", "service_ingest_documents"]
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.74.0
+    container_name: jaeger
+    command: ["--span-storage.type=badger"]
+    volumes:
+      - jaeger_data:/badger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317" # gRPC
+      - "4318:4318" # HTTP
+    profiles: ["all", "jaeger"]
+
 volumes:
   postgres_data:
   weaviate_data:
   minio_data:
   kafka_data:
+  jaeger_data:

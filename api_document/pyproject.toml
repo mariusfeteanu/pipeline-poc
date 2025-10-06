@@ -9,6 +9,11 @@ dependencies = [
     "fastapi==0.117.1",
     "kafka-python==2.2.15",
     "uvicorn[standard]==0.37.0",
+    "opentelemetry-sdk==1.37.0",
+    "opentelemetry-exporter-otlp==1.37.0",
+    "opentelemetry-instrumentation-kafka-python==0.58b0",  # for kafka-python
+    "Deprecated==1.2.18",
+
 ]
 
 [tool.setuptools]
