@@ -95,6 +95,22 @@ services:
       - .data:/app/.data
     profiles: ["all", "service", "service_ingest_documents"]
 
+  service_embed_documents:
+    build: ./service_embed_documents
+    container_name: service_embed_documents
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: "document-stored"
+      KAFKA_OUTPUT_TOPIC: "document-embedded"
+      KAFKA_GROUP_ID: "embed-documents-group"
+      OBJECT_STORAGE_URL: "http://minio:9000"
+      OBJECT_STORAGE_BUCKET: "documents"
+      OBJECT_STORAGE_USER: ${MINIO_ROOT_USER}
+      OBJECT_STORAGE_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      - kafka
+    profiles: ["all", "service", "service_embed_documents"]
+
   jaeger:
     image: jaegertracing/all-in-one:1.74.0
     container_name: jaeger

@@ -20,7 +20,7 @@ def setup_tracing(service_name: str, endpoint: str = "http://jaeger:4318/v1/trac
     return trace.get_tracer(service_name)
 
 
-tracer = setup_tracing("service_ingest_documents")
+tracer = setup_tracing("service_embed_documents")
 
 BOOTSTRAP_SERVERS = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
 INPUT_TOPIC = os.environ["KAFKA_INPUT_TOPIC"]
@@ -48,38 +48,24 @@ def create_producer():
 
 def process_message(object_storage_client: S3Client, msg_value: dict[str, str]) -> str:
     logging.info(f"Processing message: {msg_value}")
-    path = msg_value["path"]
-    key = path
-    if key.startswith("/"):
-        key = path[1:]
-    if key.startswith(".data/"):
-        key = key[len(".data/") :]
-    file_type = msg_value.get("file_type", key.split(".")[-1] if "." in key else "n/a")
-    file_source = msg_value.get("file_source", "n/a")
-    with open(path, "rb") as f:
-        content = f.read()
-        object_storage_client.put_object(
-            Bucket=OBJECT_STORAGE_BUCKET,
-            Key=key,
-            Body=content,
-            Metadata={
-                "file_type": file_type,
-                "file_source": file_source,
-                "original_path": path,
-            },
-        )
     current_span = trace.get_current_span()
-    current_span.set_attribute("object_storage.bucket", OBJECT_STORAGE_BUCKET)
+
+    object_storage_bucket = msg_value["bucket"]
+    key = msg_value["key"]
+    file_type = msg_value["file_type"]
+
+    with tracer.start_as_current_span("get_object"):
+        object = object_storage_client.get_object(Bucket=object_storage_bucket, Key=key)
+
+    current_span.set_attribute("object_storage.bucket", object_storage_bucket)
     current_span.set_attribute("object_storage.key", key)
     current_span.set_attribute("file.type", file_type)
-    logging.info(f"Uploaded {path} to bucket {OBJECT_STORAGE_BUCKET} with key {key}")
+
     return json.dumps(
         {
-            "bucket": OBJECT_STORAGE_BUCKET,
+            "bucket": object_storage_bucket,
             "key": key,
             "file_type": file_type,
-            "file_source": file_source,
-            "original_path": path,
         }
     )
 
@@ -125,7 +111,7 @@ def main() -> None:
             headers = {k: v.decode("utf-8") for k, v in raw_headers if v is not None}
             ctx = propagate.extract(headers)
 
-            with tracer.start_as_current_span("process_message", context=ctx) as span:
+            with tracer.start_as_current_span("process_message", context=ctx):
                 result = process_message(object_storage_client, value)
                 carrier: dict[str, str] = {}
                 propagate.inject(carrier)
