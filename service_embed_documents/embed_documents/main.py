@@ -12,6 +12,15 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from PyPDF2 import PdfReader
 import io
+from openai import OpenAI
+from weaviate import WeaviateClient, Collection
+from weaviate.connect import ConnectionParams, ProtocolParams
+from weaviate.collections import Collection as WeaviateCollection
+from weaviate.collections.classes.config import (
+    Property as WeaviateProperty,
+    DataType as WeaviateDataType,
+)
+
 
 def setup_tracing(service_name: str, endpoint: str = "http://jaeger:4318/v1/traces"):
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
@@ -47,25 +56,52 @@ def create_producer():
     return Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
 
 
-def process_message(object_storage_client: S3Client, msg_value: dict[str, str]) -> str:
+def process_message(
+    weaviate_collection: WeaviateCollection,
+    openai_client: OpenAI,
+    object_storage_client: S3Client,
+    msg_value: dict[str, str],
+) -> str:
     logging.info(f"Processing message: {msg_value}")
     current_span = trace.get_current_span()
 
     object_storage_bucket = msg_value["bucket"]
     key = msg_value["key"]
     file_type = msg_value["file_type"]
+    model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 
     with tracer.start_as_current_span("get_object"):
         object = object_storage_client.get_object(Bucket=object_storage_bucket, Key=key)
         object_body = object["Body"].read()
-    
+
     if file_type == "pdf":
         with tracer.start_as_current_span("read_pdf"):
             reader = PdfReader(io.BytesIO(object_body))
             text = " ".join(page.extract_text() or "" for page in reader.pages)
-            logging.warning(text[:100])
+            text = text[:1000]  # TODO: chunking
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
+
+    with tracer.start_as_current_span("embed_text"):
+        response = openai_client.embeddings.create(
+            input=text,
+            model=model,
+        )
+
+    for d in response.data:
+        embedding = d.embedding
+        dimension = len(embedding)
+        with tracer.start_as_current_span("store_embedding") as span:
+            id = weaviate_collection.data.insert(
+                properties={
+                    "text": text,
+                    "embedding_model": model,
+                    "embedding_dim": dimension,
+                },
+                vector=embedding,
+            )
+            span.set_attribute("embedding.model", model)
+            span.set_attribute("embedding.id", str(id))
 
     current_span.set_attribute("object_storage.bucket", object_storage_bucket)
     current_span.set_attribute("object_storage.key", key)
@@ -105,6 +141,29 @@ def main() -> None:
         aws_secret_access_key=os.environ["OBJECT_STORAGE_PASSWORD"],
     )
     ensure_bucket(object_storage_client, OBJECT_STORAGE_BUCKET)
+
+    openai_client = OpenAI()
+
+    weaviate_client = WeaviateClient(
+        connection_params=ConnectionParams(
+            http=ProtocolParams(host="weaviate", port=8080, secure=False),
+            grpc=ProtocolParams(host="weaviate", port=50051, secure=False),
+        )
+    )
+    class_name = "DocumentChunk"
+    if not weaviate_client.collections.exists(class_name):
+        weaviate_client.collections.create(
+            name=class_name,
+            properties=[
+                WeaviateProperty(name="text", data_type=WeaviateDataType.TEXT),
+                WeaviateProperty(
+                    name="embedding_model", data_type=WeaviateDataType.TEXT
+                ),
+                WeaviateProperty(name="embedding_dim", data_type=WeaviateDataType.INT),
+            ],
+        )
+    collection = weaviate_client.collections.get(class_name)
+
     consumer.subscribe([INPUT_TOPIC])
 
     try:
@@ -122,7 +181,9 @@ def main() -> None:
             ctx = propagate.extract(headers)
 
             with tracer.start_as_current_span("process_message", context=ctx):
-                result = process_message(object_storage_client, value)
+                result = process_message(
+                    collection, openai_client, object_storage_client, value
+                )
                 carrier: dict[str, str] = {}
                 propagate.inject(carrier)
                 out_headers = [(k, v.encode("utf-8")) for k, v in carrier.items()]

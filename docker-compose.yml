@@ -91,6 +91,7 @@ services:
       OBJECT_STORAGE_PASSWORD: ${MINIO_ROOT_PASSWORD}
     depends_on:
       - kafka
+      - minio
     volumes:
       - .data:/app/.data
     profiles: ["all", "service", "service_ingest_documents"]
@@ -107,8 +108,12 @@ services:
       OBJECT_STORAGE_BUCKET: "documents"
       OBJECT_STORAGE_USER: ${MINIO_ROOT_USER}
       OBJECT_STORAGE_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: "text-embedding-3-small"
     depends_on:
       - kafka
+      - weaviate
+      - minio
     profiles: ["all", "service", "service_embed_documents"]
 
   jaeger:
