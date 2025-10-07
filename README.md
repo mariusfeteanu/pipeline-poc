@@ -24,3 +24,4 @@ docker compose --profile all down -v
 
 - [Minio](http://localhost:9090)
 - [Jaeger](http://localhost:16686)
+- [Weaviate](http://localhost:8081/v1/objects)

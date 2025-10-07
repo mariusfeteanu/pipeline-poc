@@ -144,57 +144,58 @@ def main() -> None:
 
     openai_client = OpenAI()
 
-    weaviate_client = WeaviateClient(
+    with WeaviateClient(
         connection_params=ConnectionParams(
             http=ProtocolParams(host="weaviate", port=8080, secure=False),
             grpc=ProtocolParams(host="weaviate", port=50051, secure=False),
         )
-    )
-    class_name = "DocumentChunk"
-    if not weaviate_client.collections.exists(class_name):
-        weaviate_client.collections.create(
-            name=class_name,
-            properties=[
-                WeaviateProperty(name="text", data_type=WeaviateDataType.TEXT),
-                WeaviateProperty(
-                    name="embedding_model", data_type=WeaviateDataType.TEXT
-                ),
-                WeaviateProperty(name="embedding_dim", data_type=WeaviateDataType.INT),
-            ],
-        )
-    collection = weaviate_client.collections.get(class_name)
+    ) as weaviate_client:
+        class_name = "DocumentChunk"
+        weaviate_client.connect
+        if not weaviate_client.collections.exists(class_name):
+            weaviate_client.collections.create(
+                name=class_name,
+                properties=[
+                    WeaviateProperty(name="text", data_type=WeaviateDataType.TEXT),
+                    WeaviateProperty(
+                        name="embedding_model", data_type=WeaviateDataType.TEXT
+                    ),
+                    WeaviateProperty(name="embedding_dim", data_type=WeaviateDataType.INT),
+                ],
+            )
+        collection = weaviate_client.collections.get(class_name)
 
-    consumer.subscribe([INPUT_TOPIC])
+        consumer.subscribe([INPUT_TOPIC])
 
-    try:
-        while True:
-            msg = consumer.poll(1.0)
-            if msg is None or msg.error():
-                if msg is None:
-                    logging.info("No message received")
-                elif msg.error():
-                    logging.error(f"Consumer error: {msg.error()}")
-                continue
-            value: dict[str, str] = json.loads(msg.value().decode("utf-8"))
-            raw_headers = msg.headers() or []
-            headers = {k: v.decode("utf-8") for k, v in raw_headers if v is not None}
-            ctx = propagate.extract(headers)
+        try:
+            while True:
+                msg = consumer.poll(1.0)
+                if msg is None or msg.error():
+                    if msg is None:
+                        logging.info("No message received")
+                    elif msg.error():
+                        logging.error(f"Consumer error: {msg.error()}")
+                    continue
+                value: dict[str, str] = json.loads(msg.value().decode("utf-8"))
+                raw_headers = msg.headers() or []
+                headers = {k: v.decode("utf-8") for k, v in raw_headers if v is not None}
+                ctx = propagate.extract(headers)
 
-            with tracer.start_as_current_span("process_message", context=ctx):
-                result = process_message(
-                    collection, openai_client, object_storage_client, value
-                )
-                carrier: dict[str, str] = {}
-                propagate.inject(carrier)
-                out_headers = [(k, v.encode("utf-8")) for k, v in carrier.items()]
-                producer.produce(
-                    OUTPUT_TOPIC, result.encode("utf-8"), headers=out_headers
-                )
-                producer.flush()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        consumer.close()
+                with tracer.start_as_current_span("process_message", context=ctx):
+                    result = process_message(
+                        collection, openai_client, object_storage_client, value
+                    )
+                    carrier: dict[str, str] = {}
+                    propagate.inject(carrier)
+                    out_headers = [(k, v.encode("utf-8")) for k, v in carrier.items()]
+                    producer.produce(
+                        OUTPUT_TOPIC, result.encode("utf-8"), headers=out_headers
+                    )
+                    producer.flush()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            consumer.close()
 
 
 if __name__ == "__main__":
