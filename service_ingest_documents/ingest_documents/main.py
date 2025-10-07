@@ -57,17 +57,19 @@ def process_message(object_storage_client: S3Client, msg_value: dict[str, str]) 
     file_type = msg_value.get("file_type", key.split(".")[-1] if "." in key else "n/a")
     file_source = msg_value.get("file_source", "n/a")
     with open(path, "rb") as f:
-        content = f.read()
-        object_storage_client.put_object(
-            Bucket=OBJECT_STORAGE_BUCKET,
-            Key=key,
-            Body=content,
-            Metadata={
-                "file_type": file_type,
-                "file_source": file_source,
-                "original_path": path,
-            },
-        )
+        with tracer.start_as_current_span("retrieve_file"):
+            content = f.read()
+        with tracer.start_as_current_span("upload_file"):
+            object_storage_client.put_object(
+                Bucket=OBJECT_STORAGE_BUCKET,
+                Key=key,
+                Body=content,
+                Metadata={
+                    "file_type": file_type,
+                    "file_source": file_source,
+                    "original_path": path,
+                },
+            )
     current_span = trace.get_current_span()
     current_span.set_attribute("object_storage.bucket", OBJECT_STORAGE_BUCKET)
     current_span.set_attribute("object_storage.key", key)

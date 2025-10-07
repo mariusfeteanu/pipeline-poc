@@ -12,6 +12,7 @@ dependencies = [
     "boto3-stubs[s3]==1.40.40",
     "opentelemetry-sdk==1.37.0",
     "opentelemetry-exporter-otlp==1.37.0",
+    "PyPDF2==3.0.1",
 ]
 
 [project.optional-dependencies]

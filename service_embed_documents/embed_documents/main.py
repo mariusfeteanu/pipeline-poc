@@ -10,7 +10,8 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
+from PyPDF2 import PdfReader
+import io
 
 def setup_tracing(service_name: str, endpoint: str = "http://jaeger:4318/v1/traces"):
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
@@ -56,6 +57,15 @@ def process_message(object_storage_client: S3Client, msg_value: dict[str, str]) 
 
     with tracer.start_as_current_span("get_object"):
         object = object_storage_client.get_object(Bucket=object_storage_bucket, Key=key)
+        object_body = object["Body"].read()
+    
+    if file_type == "pdf":
+        with tracer.start_as_current_span("read_pdf"):
+            reader = PdfReader(io.BytesIO(object_body))
+            text = " ".join(page.extract_text() or "" for page in reader.pages)
+            logging.warning(text[:100])
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
 
     current_span.set_attribute("object_storage.bucket", object_storage_bucket)
     current_span.set_attribute("object_storage.key", key)
