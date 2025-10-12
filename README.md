@@ -21,7 +21,11 @@ To stop and remove all containers, networks, and volumes created by `docker comp
 docker compose --profile all down -v
 ```
 
+```
+. ./scripts/trigger-ingest.sh
+```
 
-- [Minio](http://localhost:9090)
+
+- [Minio](http://localhost:9090)    
 - [Jaeger](http://localhost:16686)
 - [Weaviate](http://localhost:8081/v1/objects)

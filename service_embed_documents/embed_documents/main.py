@@ -151,7 +151,6 @@ def main() -> None:
         )
     ) as weaviate_client:
         class_name = "DocumentChunk"
-        weaviate_client.connect
         if not weaviate_client.collections.exists(class_name):
             weaviate_client.collections.create(
                 name=class_name,
