@@ -116,6 +116,18 @@ services:
       - minio
     profiles: ["all", "service", "service_embed_documents"]
 
+  ui_embeddings:
+    build: ./ui_embeddings
+    container_name: ui_embeddings
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: "text-embedding-3-small"
+    ports:
+      - "8082:8082"
+    depends_on:
+      - weaviate
+    profiles: ["all", "ui", "ui_embeddings"]
+
   jaeger:
     image: jaegertracing/all-in-one:1.74.0
     container_name: jaeger

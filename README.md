@@ -8,6 +8,7 @@ To start all services defined in this project:
 docker compose build api_document
 docker compose build service_ingest_documents
 docker compose build service_embed_documents
+docker compose build ui_embeddings
 docker compose --profile all up -d
 ```
 
@@ -28,4 +29,5 @@ docker compose --profile all down -v
 
 - [Minio](http://localhost:9090)    
 - [Jaeger](http://localhost:16686)
-- [Weaviate](http://localhost:8081/v1/objects)
+- [Weaviate Objects](http://localhost:8081/v1/objects) [Schema](http://localhost:8081/v1/schema)
+- [Embeddings UI](http://localhost:8082)

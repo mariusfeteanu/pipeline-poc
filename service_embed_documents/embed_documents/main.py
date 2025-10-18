@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -5,21 +6,18 @@ import os
 import boto3
 from confluent_kafka import Consumer, Producer  # type: ignore
 from mypy_boto3_s3.client import S3Client
+from openai import OpenAI
 from opentelemetry import propagate, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from PyPDF2 import PdfReader
-import io
-from openai import OpenAI
-from weaviate import WeaviateClient, Collection
-from weaviate.connect import ConnectionParams, ProtocolParams
+from weaviate import Collection, WeaviateClient
 from weaviate.collections import Collection as WeaviateCollection
-from weaviate.collections.classes.config import (
-    Property as WeaviateProperty,
-    DataType as WeaviateDataType,
-)
+from weaviate.collections.classes.config import DataType as WeaviateDataType
+from weaviate.collections.classes.config import Property as WeaviateProperty
+from weaviate.connect import ConnectionParams, ProtocolParams
 
 
 def setup_tracing(service_name: str, endpoint: str = "http://jaeger:4318/v1/traces"):
@@ -77,6 +75,10 @@ def process_message(
     if file_type == "pdf":
         with tracer.start_as_current_span("read_pdf"):
             reader = PdfReader(io.BytesIO(object_body))
+            metadata = reader.metadata
+            title = metadata.title if metadata and metadata.title else None
+            author = metadata.author if metadata and metadata.author else None
+            subject = metadata.subject if metadata and metadata.subject else None
             text = " ".join(page.extract_text() or "" for page in reader.pages)
             text = text[:1000]  # TODO: chunking
     else:
@@ -97,6 +99,12 @@ def process_message(
                     "text": text,
                     "embedding_model": model,
                     "embedding_dim": dimension,
+                    "bucket": object_storage_bucket,
+                    "key": key,
+                    "file_type": file_type,
+                    "metadata_title": title,
+                    "metadata_author": author,
+                    "metadata_subject": subject,
                 },
                 vector=embedding,
             )
@@ -159,7 +167,21 @@ def main() -> None:
                     WeaviateProperty(
                         name="embedding_model", data_type=WeaviateDataType.TEXT
                     ),
-                    WeaviateProperty(name="embedding_dim", data_type=WeaviateDataType.INT),
+                    WeaviateProperty(
+                        name="embedding_dim", data_type=WeaviateDataType.INT
+                    ),
+                    WeaviateProperty(name="bucket", data_type=WeaviateDataType.TEXT),
+                    WeaviateProperty(name="key", data_type=WeaviateDataType.TEXT),
+                    WeaviateProperty(name="file_type", data_type=WeaviateDataType.TEXT),
+                    WeaviateProperty(
+                        name="metadata_title", data_type=WeaviateDataType.TEXT
+                    ),
+                    WeaviateProperty(
+                        name="metadata_author", data_type=WeaviateDataType.TEXT
+                    ),
+                    WeaviateProperty(
+                        name="metadata_subject", data_type=WeaviateDataType.TEXT
+                    ),
                 ],
             )
         collection = weaviate_client.collections.get(class_name)
@@ -177,7 +199,9 @@ def main() -> None:
                     continue
                 value: dict[str, str] = json.loads(msg.value().decode("utf-8"))
                 raw_headers = msg.headers() or []
-                headers = {k: v.decode("utf-8") for k, v in raw_headers if v is not None}
+                headers = {
+                    k: v.decode("utf-8") for k, v in raw_headers if v is not None
+                }
                 ctx = propagate.extract(headers)
 
                 with tracer.start_as_current_span("process_message", context=ctx):

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-LIMIT="${1:-10}"
+LIMIT="${1:-100}"
 DOMAIN="${2:-physics.pop-ph}"
 TYPE="${3:-pdf}"
 DIR=".data/papers/$DOMAIN/$TYPE"
