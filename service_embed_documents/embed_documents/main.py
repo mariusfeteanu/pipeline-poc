@@ -14,7 +14,8 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from PyPDF2 import PdfReader
-from weaviate import Collection, WeaviateClient
+from weaviate import WeaviateClient
+from weaviate.classes.config import Configure, VectorDistances
 from weaviate.collections import Collection as WeaviateCollection
 from weaviate.collections.classes.config import DataType as WeaviateDataType
 from weaviate.collections.classes.config import Property as WeaviateProperty
@@ -53,7 +54,7 @@ def create_producer():
     return Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
 
 
-def chunk_text(text: str, max_chunk_size: int = 800, overlap: int = 100) -> list[str]:
+def chunk_text(text: str, max_chunk_size: int = 300, overlap: int = 50) -> list[str]:
     sentences = re.split(r"(?<=[.!?])\s+", text)
     chunks, current = [], ""
     for sent in sentences:
@@ -96,6 +97,7 @@ def process_message(
         raise ValueError(f"Unsupported file type: {file_type}")
 
     with tracer.start_as_current_span("embed_text"):
+        chunks = [c.strip() for c in chunks if c.strip()]
         response = openai_client.embeddings.create(input=chunks, model=model)
 
     for text, d in zip(chunks, response.data):
@@ -177,6 +179,13 @@ def main() -> None:
                         name="metadata_subject", data_type=WeaviateDataType.TEXT
                     ),
                 ],
+                vectorizer_config=Configure.Vectorizer.none(),
+                vector_index_config=Configure.VectorIndex.hnsw(
+                    distance_metric=VectorDistances.COSINE,
+                    ef_construction=128,
+                    max_connections=64,
+                    ef=128,
+                ),
             )
         collection = weaviate_client.collections.get(class_name)
         consumer.subscribe([INPUT_TOPIC])
