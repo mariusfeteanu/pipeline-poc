@@ -2,6 +2,7 @@ import io
 import json
 import logging
 import os
+import re
 
 import boto3
 from confluent_kafka import Consumer, Producer  # type: ignore
@@ -39,7 +40,6 @@ OBJECT_STORAGE_BUCKET = os.environ["OBJECT_STORAGE_BUCKET"]
 
 
 def create_consumer():
-    logging.info(f"Creating consumer with {BOOTSTRAP_SERVERS=}, {GROUP_ID=}")
     return Consumer(
         {
             "bootstrap.servers": BOOTSTRAP_SERVERS,
@@ -50,8 +50,21 @@ def create_consumer():
 
 
 def create_producer():
-    logging.info(f"Creating producer with {BOOTSTRAP_SERVERS=}")
     return Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
+
+
+def chunk_text(text: str, max_chunk_size: int = 800, overlap: int = 100) -> list[str]:
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks, current = [], ""
+    for sent in sentences:
+        if len(current) + len(sent) + 1 <= max_chunk_size:
+            current += (" " if current else "") + sent
+        else:
+            chunks.append(current.strip())
+            current = current[-overlap:] + " " + sent
+    if current:
+        chunks.append(current.strip())
+    return chunks
 
 
 def process_message(
@@ -60,9 +73,7 @@ def process_message(
     object_storage_client: S3Client,
     msg_value: dict[str, str],
 ) -> str:
-    logging.info(f"Processing message: {msg_value}")
     current_span = trace.get_current_span()
-
     object_storage_bucket = msg_value["bucket"]
     key = msg_value["key"]
     file_type = msg_value["file_type"]
@@ -79,18 +90,15 @@ def process_message(
             title = metadata.title if metadata and metadata.title else None
             author = metadata.author if metadata and metadata.author else None
             subject = metadata.subject if metadata and metadata.subject else None
-            text = " ".join(page.extract_text() or "" for page in reader.pages)
-            text = text[:1000]  # TODO: chunking
+            full_text = " ".join(page.extract_text() or "" for page in reader.pages)
+            chunks = chunk_text(full_text)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
     with tracer.start_as_current_span("embed_text"):
-        response = openai_client.embeddings.create(
-            input=text,
-            model=model,
-        )
+        response = openai_client.embeddings.create(input=chunks, model=model)
 
-    for d in response.data:
+    for text, d in zip(chunks, response.data):
         embedding = d.embedding
         dimension = len(embedding)
         with tracer.start_as_current_span("store_embedding") as span:
@@ -116,30 +124,17 @@ def process_message(
     current_span.set_attribute("file.type", file_type)
 
     return json.dumps(
-        {
-            "bucket": object_storage_bucket,
-            "key": key,
-            "file_type": file_type,
-        }
+        {"bucket": object_storage_bucket, "key": key, "file_type": file_type}
     )
 
 
 def ensure_bucket(client: S3Client, bucket_name: str):
     if bucket_name in [b["Name"] for b in client.list_buckets()["Buckets"]]:
-        logging.info(f"Bucket already exists: {bucket_name}")
         return
-    logging.info(f"Creating bucket: {bucket_name}")
     client.create_bucket(Bucket=bucket_name)
 
 
 def main() -> None:
-    logging.info(f"{BOOTSTRAP_SERVERS=}")
-    logging.info(f"{INPUT_TOPIC=}")
-    logging.info(f"{OUTPUT_TOPIC=}")
-    logging.info(f"{GROUP_ID=}")
-    logging.info(f"{OBJECT_STORAGE_URL=}")
-    logging.info(f"{OBJECT_STORAGE_BUCKET=}")
-
     consumer = create_consumer()
     producer = create_producer()
     object_storage_client: S3Client = boto3.client(
@@ -149,7 +144,6 @@ def main() -> None:
         aws_secret_access_key=os.environ["OBJECT_STORAGE_PASSWORD"],
     )
     ensure_bucket(object_storage_client, OBJECT_STORAGE_BUCKET)
-
     openai_client = OpenAI()
 
     with WeaviateClient(
@@ -185,17 +179,12 @@ def main() -> None:
                 ],
             )
         collection = weaviate_client.collections.get(class_name)
-
         consumer.subscribe([INPUT_TOPIC])
 
         try:
             while True:
                 msg = consumer.poll(1.0)
                 if msg is None or msg.error():
-                    if msg is None:
-                        logging.info("No message received")
-                    elif msg.error():
-                        logging.error(f"Consumer error: {msg.error()}")
                     continue
                 value: dict[str, str] = json.loads(msg.value().decode("utf-8"))
                 raw_headers = msg.headers() or []
@@ -203,7 +192,6 @@ def main() -> None:
                     k: v.decode("utf-8") for k, v in raw_headers if v is not None
                 }
                 ctx = propagate.extract(headers)
-
                 with tracer.start_as_current_span("process_message", context=ctx):
                     result = process_message(
                         collection, openai_client, object_storage_client, value

@@ -1,8 +1,8 @@
 import urllib
+
 import streamlit as st
 from openai import OpenAI
-from weaviate import WeaviateClient, ConnectionParams, ProtocolParams
-
+from weaviate import ConnectionParams, ProtocolParams, WeaviateClient
 
 WEAVIATE_HTTP = {"host": "weaviate", "port": 8080, "secure": False}
 WEAVIATE_GRPC = {"host": "weaviate", "port": 50051, "secure": False}
