@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-docker compose --profile all down -v
+docker compose --profile all down $@

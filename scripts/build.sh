@@ -13,4 +13,5 @@ else
     build_service service_ingest_documents
     build_service service_embed_documents
     build_service ui_embeddings
+    build_service ui_chat
 fi
