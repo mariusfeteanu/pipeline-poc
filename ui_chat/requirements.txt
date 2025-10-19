@@ -120,6 +120,8 @@ pydantic-core==2.41.1
     # via pydantic
 pydeck==0.9.1
     # via streamlit
+pypdf2==3.0.1
+    # via ui_chat (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
     #   botocore
