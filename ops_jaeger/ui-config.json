@@ -4,7 +4,7 @@
     "menuEnabled": true
   },
   "monitor": {
-    "menuEnabled": true
+    "menuEnabled": false
   },
   "archiveEnabled": true,
   "tracking": {
