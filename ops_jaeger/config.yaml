@@ -11,8 +11,6 @@ extensions:
       prometheus_metrics:
         prometheus:
           endpoint: http://prometheus:9090
-          normalize_calls: true
-          normalize_duration: true
 
   jaeger_query:
     storage:
