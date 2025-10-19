@@ -126,6 +126,7 @@ services:
       - "8082:8082"
     depends_on:
       - weaviate
+      - minio
     profiles: ["all", "ui", "ui_embeddings"]
 
   jaeger:

@@ -100,10 +100,10 @@ def process_message(
         chunks = [c.strip() for c in chunks if c.strip()]
         response = openai_client.embeddings.create(input=chunks, model=model)
 
-    for text, d in zip(chunks, response.data):
-        embedding = d.embedding
-        dimension = len(embedding)
-        with tracer.start_as_current_span("store_embedding") as span:
+    with tracer.start_as_current_span("store_embedding") as span:
+        for text, d in zip(chunks, response.data):
+            embedding = d.embedding
+            dimension = len(embedding)
             id = weaviate_collection.data.insert(
                 properties={
                     "text": text,

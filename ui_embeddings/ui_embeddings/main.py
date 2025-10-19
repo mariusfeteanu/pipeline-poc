@@ -56,11 +56,14 @@ if st.button("Search") and query.strip():
         title = props.get("metadata_title")
         author = props.get("metadata_author")
         subject = props.get("metadata_subject")
-        link = (
-            f"http://localhost:9090/browser/{bucket}/{urllib.parse.quote(key, safe='')}"
-        )
+
+        link = s3.generate_presigned_url(
+    "get_object",
+    Params={"Bucket": str(bucket), "Key": str(key)},
+    ExpiresIn=3600,  # seconds, e.g. 1 hour
+) if bucket and key else "#"
         st.markdown(
-            f"**{i+1}. [{title or key.split('/')[-1] if key else '???'}]({link})**"
+            f"**{i+1}. [{title or str(key).split('/')[-1] if key else '???'}]({link})**"
         )
         if author:
             st.markdown(f"*Author:* {author}")

@@ -46,6 +46,7 @@ class DocumentLandedEvent(BaseModel):
     file_type: str
     file_source: str
 
+
 def setup_tracing():
     provider = TracerProvider(
         resource=Resource.create({"service.name": "api_document"})
@@ -55,7 +56,9 @@ def setup_tracing():
     provider.add_span_processor(BatchSpanProcessor(exporter))
     return trace.get_tracer(__name__)
 
+
 tracer = setup_tracing()
+
 
 @app.middleware("http")
 async def tracing_middleware(request: Request, call_next):
