@@ -1,0 +1,39 @@
+extensions:
+  jaeger_storage:
+    backends:
+      badger_storage:
+        badger:
+          directories:
+            keys: /badger/key
+            values: /badger/value
+          ephemeral: false
+    metric_backends:
+      prometheus_metrics:
+        prometheus:
+          endpoint: http://prometheus:9090
+          normalize_calls: true
+          normalize_duration: true
+
+  jaeger_query:
+    storage:
+      traces: badger_storage
+      metrics: prometheus_metrics
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: badger_storage
+
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [jaeger_storage_exporter]

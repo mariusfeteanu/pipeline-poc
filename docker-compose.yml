@@ -75,6 +75,7 @@ services:
       - "8000:8000"
     depends_on:
       - kafka
+      - otel-collector
     profiles: ["all", "api"]
 
   service_ingest_documents:
@@ -92,6 +93,7 @@ services:
     depends_on:
       - kafka
       - minio
+      - otel-collector
     volumes:
       - .data:/app/.data
     profiles: ["all", "service", "service_ingest_documents"]
@@ -114,6 +116,7 @@ services:
       - kafka
       - weaviate
       - minio
+      - otel-collector
     profiles: ["all", "service", "service_embed_documents"]
 
   ui_embeddings:
@@ -133,16 +136,45 @@ services:
     profiles: ["all", "ui", "ui_embeddings"]
 
   jaeger:
-    image: jaegertracing/all-in-one:1.74.0
+    image: jaegertracing/jaeger:2.11.0
     container_name: jaeger
-    command: ["--span-storage.type=badger"]
+    user: "0:0"
     volumes:
       - jaeger_data:/badger
+      - ./ops_jaeger/config.yaml:/etc/jaeger/config.yaml
+    command: ["--config", "/etc/jaeger/config.yaml"]
     ports:
-      - "16686:16686"  # Jaeger UI
-      - "4317:4317" # gRPC
-      - "4318:4318" # HTTP
-    profiles: ["all", "jaeger"]
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - prometheus
+    profiles: ["all", "observability", "jaeger"]
+
+
+  prometheus:
+      image: prom/prometheus:v3.7.1
+      container_name: prometheus
+      ports:
+        - "9091:9090"
+      volumes:
+        - ./ops_prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+        - prometheus_data:/prometheus
+      profiles: ["all", "observability", "prometheus"]
+      
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.86.0
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./ops_otel/config.yaml:/etc/otel/config.yaml
+    ports:
+      - "8889:8889"
+    depends_on:
+      - jaeger
+      - prometheus
+    profiles: ["all", "observability", "otel"]
+
 
 volumes:
   postgres_data:
@@ -150,3 +182,4 @@ volumes:
   minio_data:
   kafka_data:
   jaeger_data:
+  prometheus_data:

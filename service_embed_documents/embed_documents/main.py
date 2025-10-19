@@ -22,7 +22,9 @@ from weaviate.collections.classes.config import Property as WeaviateProperty
 from weaviate.connect import ConnectionParams, ProtocolParams
 
 
-def setup_tracing(service_name: str, endpoint: str = "http://jaeger:4318/v1/traces"):
+def setup_tracing(
+    service_name: str, endpoint: str = "http://otel-collector:4318/v1/traces"
+):
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
     trace.set_tracer_provider(provider)
     exporter = OTLPSpanExporter(endpoint=endpoint)

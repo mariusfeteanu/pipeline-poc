@@ -31,3 +31,4 @@ docker compose --profile all down -v
 - [Jaeger](http://localhost:16686)
 - [Weaviate Objects](http://localhost:8081/v1/objects) [Schema](http://localhost:8081/v1/schema)
 - [Embeddings UI](http://localhost:8082)
+- [Prometheus](http://localhost:9091)

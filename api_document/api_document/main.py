@@ -52,7 +52,7 @@ def setup_tracing():
         resource=Resource.create({"service.name": "api_document"})
     )
     trace.set_tracer_provider(provider)
-    exporter = OTLPSpanExporter(endpoint="http://jaeger:4318/v1/traces")
+    exporter = OTLPSpanExporter(endpoint="http://otel-collector:4318/v1/traces")
     provider.add_span_processor(BatchSpanProcessor(exporter))
     return trace.get_tracer(__name__)
 
