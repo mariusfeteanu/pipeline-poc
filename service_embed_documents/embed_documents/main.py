@@ -14,6 +14,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from PyPDF2 import PdfReader
+from PyPDF2.errors import PdfReadError
 from weaviate import WeaviateClient
 from weaviate.classes.config import Configure, VectorDistances
 from weaviate.collections import Collection as WeaviateCollection
@@ -75,7 +76,7 @@ def process_message(
     openai_client: OpenAI,
     object_storage_client: S3Client,
     msg_value: dict[str, str],
-) -> str:
+) -> str | None:
     current_span = trace.get_current_span()
     object_storage_bucket = msg_value["bucket"]
     key = msg_value["key"]
@@ -87,20 +88,32 @@ def process_message(
         object_body = object["Body"].read()
 
     if file_type == "pdf":
-        with tracer.start_as_current_span("read_pdf"):
-            reader = PdfReader(io.BytesIO(object_body))
-            metadata = reader.metadata
-            title = metadata.title if metadata and metadata.title else None
-            author = metadata.author if metadata and metadata.author else None
-            subject = metadata.subject if metadata and metadata.subject else None
-            full_text = " ".join(page.extract_text() or "" for page in reader.pages)
-            chunks = chunk_text(full_text)
+        try:
+            with tracer.start_as_current_span("read_pdf"):
+                reader = PdfReader(io.BytesIO(object_body))
+                metadata = reader.metadata
+                title = metadata.title if metadata and metadata.title else None
+                author = metadata.author if metadata and metadata.author else None
+                subject = metadata.subject if metadata and metadata.subject else None
+                full_text = " ".join(page.extract_text() or "" for page in reader.pages)
+                chunks = chunk_text(full_text)
+        except PdfReadError as e:
+            logging.error(
+                f"Failed to read PDF {key} from bucket {object_storage_bucket}: {e}"
+            )
+            return
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
     with tracer.start_as_current_span("embed_text"):
-        chunks = [c.strip() for c in chunks if c.strip()]
-        response = openai_client.embeddings.create(input=chunks, model=model)
+        try:
+            chunks = [c.strip() for c in chunks if c.strip()]
+            response = openai_client.embeddings.create(input=chunks, model=model)
+        except Exception as e:
+            logging.error(
+                f"Failed to create embeddings for {key} from bucket {object_storage_bucket}: {e}"
+            )
+            return
 
     with tracer.start_as_current_span("store_embedding") as span:
         for text, d in zip(chunks, response.data):
@@ -211,7 +224,9 @@ def main() -> None:
                     propagate.inject(carrier)
                     out_headers = [(k, v.encode("utf-8")) for k, v in carrier.items()]
                     producer.produce(
-                        OUTPUT_TOPIC, result.encode("utf-8"), headers=out_headers
+                        OUTPUT_TOPIC,
+                        result.encode("utf-8") if result else b"",
+                        headers=out_headers,
                     )
                     producer.flush()
         except KeyboardInterrupt:

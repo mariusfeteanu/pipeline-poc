@@ -80,14 +80,20 @@ def retrieve_documents(
 def build_context(use_chunks: bool, use_documents: bool, query: str, top_k: int) -> str:
     if not (use_chunks or use_documents):
         return ""
-    collection = get_weaviate_collection()
     embedding = get_query_embedding(query)
     texts: list[str] = []
-    if use_chunks:
-        texts.extend(retrieve_chunks(collection, embedding, top_k))
-    if use_documents:
-        s3_client = get_s3_client()
-        texts.extend(retrieve_documents(collection, embedding, top_k, s3_client))
+    with WeaviateClient(
+        connection_params=ConnectionParams(
+            http=ProtocolParams(host="weaviate", port=8080, secure=False),
+            grpc=ProtocolParams(host="weaviate", port=50051, secure=False),
+        )
+    ) as wclient:
+        collection = wclient.collections.get("DocumentChunk")
+        if use_chunks:
+            texts.extend(retrieve_chunks(collection, embedding, top_k))
+        if use_documents:
+            s3_client = get_s3_client()
+            texts.extend(retrieve_documents(collection, embedding, top_k, s3_client))
     return "\n".join(texts)
 
 
@@ -111,16 +117,18 @@ def main() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    forget = st.button("Forget Conversation")
+    if forget:
+        st.session_state.messages = []
+        st.rerun()
+
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
 
     with st.sidebar:
-        use_retrieval = st.checkbox("Use Retrieval", value=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            use_chunks = st.checkbox("Use Chunks", value=False)
-        with col2:
-            use_documents = st.checkbox("Use Documents", value=False)
+        st.markdown("### Retrieval Options")
+        use_chunks = st.checkbox("Use Chunks", value=False)
+        use_documents = st.checkbox("Use Documents", value=False)
         relevancy_k = st.slider("Top K", 1, 10, 3) if use_chunks else 3
 
     with st.form("chat_form", clear_on_submit=True):
@@ -131,11 +139,7 @@ def main() -> None:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
 
-        context = (
-            build_context(use_chunks, use_documents, prompt, relevancy_k)
-            if use_retrieval
-            else ""
-        )
+        context = build_context(use_chunks, use_documents, prompt, relevancy_k)
         reply = chat(prompt, context)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
