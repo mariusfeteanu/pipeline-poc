@@ -77,17 +77,18 @@ def retrieve_documents(
     return list(docs.values())
 
 
-def build_context(mode: str, query: str, top_k: int) -> str:
-    if mode == "none":
+def build_context(use_chunks: bool, use_documents: bool, query: str, top_k: int) -> str:
+    if not (use_chunks or use_documents):
         return ""
     collection = get_weaviate_collection()
     embedding = get_query_embedding(query)
-    if mode == "chunks":
-        return "\n".join(retrieve_chunks(collection, embedding, top_k))
-    if mode == "documents":
+    texts: list[str] = []
+    if use_chunks:
+        texts.extend(retrieve_chunks(collection, embedding, top_k))
+    if use_documents:
         s3_client = get_s3_client()
-        return "\n".join(retrieve_documents(collection, embedding, top_k, s3_client))
-    return ""
+        texts.extend(retrieve_documents(collection, embedding, top_k, s3_client))
+    return "\n".join(texts)
 
 
 def chat(prompt: str, context: str) -> str:
@@ -97,11 +98,7 @@ def chat(prompt: str, context: str) -> str:
         | ChatCompletionSystemMessageParam
     ] = []
     if context:
-        messages.append(
-            ChatCompletionSystemMessageParam(
-                role="system", content=f"Context:\n{context}"
-            )
-        )
+        messages.append({"role": "system", "content": f"Context:\n{context}"})
     messages += st.session_state.messages  # type: ignore
     response = client.chat.completions.create(model=model, messages=messages)
     content = response.choices[0].message.content
@@ -119,8 +116,12 @@ def main() -> None:
 
     with st.sidebar:
         use_retrieval = st.checkbox("Use Retrieval", value=True)
-        retrieval_mode = st.selectbox("Retrieval Mode", ["chunks", "documents", "none"])
-        relevancy_k = st.slider("Top K", 1, 10, 3)
+        col1, col2 = st.columns(2)
+        with col1:
+            use_chunks = st.checkbox("Use Chunks", value=False)
+        with col2:
+            use_documents = st.checkbox("Use Documents", value=False)
+        relevancy_k = st.slider("Top K", 1, 10, 3) if use_chunks else 3
 
     with st.form("chat_form", clear_on_submit=True):
         prompt = st.text_area("Message:", placeholder="Type here...")
@@ -130,8 +131,10 @@ def main() -> None:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
 
-        context = build_context(
-            retrieval_mode if use_retrieval else "none", prompt, relevancy_k
+        context = (
+            build_context(use_chunks, use_documents, prompt, relevancy_k)
+            if use_retrieval
+            else ""
         )
         reply = chat(prompt, context)
 
