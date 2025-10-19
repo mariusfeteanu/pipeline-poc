@@ -142,6 +142,7 @@ services:
     volumes:
       - jaeger_data:/badger
       - ./ops_jaeger/config.yaml:/etc/jaeger/config.yaml
+      - ./ops_jaeger/ui-config.json:/etc/jaeger/ui-config.json
     command: ["--config", "/etc/jaeger/config.yaml"]
     ports:
       - "16686:16686"

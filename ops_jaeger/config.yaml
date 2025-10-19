@@ -18,6 +18,9 @@ extensions:
     storage:
       traces: badger_storage
       metrics: prometheus_metrics
+    ui:
+      config_file: /etc/jaeger/ui-config.json
+      log_access: true
 
 receivers:
   otlp:
