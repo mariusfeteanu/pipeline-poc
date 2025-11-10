@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+# TODO: None of this works for jaeger UI, using promehtes for now
+exporters:
+  otlp:
+    endpoint: http://jaeger:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    resource_to_telemetry_conversion:
+        enabled: true
+    enable_open_metrics: true
+
+processors:
+  batch:
+
+connectors:
+  spanmetrics:
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [otlp, spanmetrics]
+      exporters: [prometheus]

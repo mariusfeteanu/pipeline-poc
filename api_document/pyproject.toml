@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api_document"
+version = "0.1.0"
+dependencies = [
+    "fastapi==0.117.1",
+    "kafka-python==2.2.15",
+    "uvicorn[standard]==0.37.0",
+    "opentelemetry-sdk==1.37.0",
+    "opentelemetry-exporter-otlp==1.37.0",
+    "opentelemetry-instrumentation-kafka-python==0.58b0",  # for kafka-python
+    "Deprecated==1.2.18",
+
+]
+
+[tool.setuptools]
+packages = ["api_document"]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.9.0",
+    "isort==6.0.1",
+    "build==1.3.0",
+    "pip-tools==7.5.0",
+    "mypy",
+]

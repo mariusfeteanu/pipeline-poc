@@ -1,0 +1,6 @@
+weaviate-client==4.17.0
+psycopg2-binary==2.9.10
+python-dotenv==1.1.1
+boto3==1.40.40
+pdfplumber==0.11.7
+kafka-python==2.2.15
